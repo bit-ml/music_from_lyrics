@@ -1,0 +1,9 @@
+lyrics/*
+*.mid
+__pycache__/
+*.bz2
+transposed/*
+wiki_pretrained/*
+*.pt
+generated*
+preloaded/*
