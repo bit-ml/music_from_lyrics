@@ -1,5 +1,3 @@
-# Bitdefender 2017
-
 import torch.nn as nn
 import torch
 from torch.autograd import Variable
@@ -10,21 +8,28 @@ class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
     def __init__(self, rnn_type, ntoken, ntokens_lyrics, ninp, nhid, nlayers, dropout=0.5, tie_weights=False, pre_embeds=None,
-            ncontext=None):
+            ncontext=None, compressor=None):
         super(RNNModel, self).__init__()
         self.drop           = nn.Dropout(dropout)
         self.encoder        = nn.Embedding(ntoken, ninp)
         self.encoder_lyrics = nn.Embedding(ntokens_lyrics, ninp)
-        self.ncontext = ncontext
+        self.compressor     = None
+        self.ncontext       = ncontext
+        self.ninp           = ninp
+
         if pre_embeds is not None:
-            embeddings = pre_embeds#torch.from_numpy(pre_embeds.wv.syn0)
+            embeddings = pre_embeds #torch.from_numpy(pre_embeds.wv.syn0)
+            if compressor and self.ncontext:
+                self.compressor      = nn.Linear(ncontext * ninp, ninp)
+            
             self.encoder_lyrics.weight = torch.nn.Parameter(embeddings)
         else:
             pass
-            # print(self.encoder_lyrics.weight)
-            # sys.exit(-1)
+
         if rnn_type in ['LSTM', 'GRU']:
             added = ncontext if ncontext else 0
+            if self.compressor:
+                added = 1
             self.rnn = getattr(nn, rnn_type)((2 + added) * ninp, nhid, nlayers)#, dropout=dropout)
         else:
             try:
@@ -64,21 +69,41 @@ class RNNModel(nn.Module):
         data        = input[0:half,:]
         data_lyrics = input[half:,:]
         emb = self.drop(self.encoder(data))
+        emb_size = emb.size()
         emb2 = self.drop(self.encoder_lyrics(data_lyrics))
         emb = self.encoder(data)
         emb2 = self.encoder_lyrics(data_lyrics)
         emb_combined = torch.cat([emb, emb2],2)
 
-        if self.ncontext is not None:
+        if not self.compressor and (self.ncontext is not None):
             for i in range(self.ncontext):
                 emb_extra = self.drop(self.encoder(extra_notes[i]))
                 emb_combined = torch.cat([emb_combined, emb_extra], 2)
 
+        elif self.compressor and (self.ncontext is not None):
+
+            embs_ = None#torch.autograd.Variable(torch.FloatTensor().cuda())
+            for i in range(self.ncontext):
+                emb_extra = self.drop(self.encoder(extra_notes[i]))
+                if embs_ is None:
+                    embs_ = emb_extra
+                else:
+                    embs_ = torch.cat([embs_, emb_extra], 2)
+
+            embs_size = embs_.size()
+            embs_     = embs_.view(-1, self.ncontext * self.ninp)
+            embs_compressed = self.compressor(embs_)
+            embs_compressed = embs_compressed.view(emb_size)
+
+            emb_combined = torch.cat([emb_combined, embs_compressed], 2)
+
         output, hidden = self.rnn(emb_combined, hidden)
         output = self.drop(output)
 
-        decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
-        return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden
+        decoded = self.decoder(output.view(output.size(0)*output.size(1),\
+                output.size(2)))
+        return decoded.view(output.size(0), output.size(1),\
+                decoded.size(1)), hidden
 
     def init_hidden(self, bsz):
         weight = next(self.parameters()).data

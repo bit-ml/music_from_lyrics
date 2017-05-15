@@ -1,12 +1,10 @@
-# Bitdefender 2017
-
 import argparse
 import time
 import math
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-
+import os
 import data_words_music
 import data
 import model
@@ -71,7 +69,8 @@ def save_to_file(model, char_len, fname):
          f.write(char)
       f.write('\n')
 
-parser = argparse.ArgumentParser(description='PyTorch Music From lyrics generator')
+parser = argparse.ArgumentParser(\
+        description='PyTorch Music From lyrics generator')
 parser.add_argument('--data', type=str, default='./data',
                     help='location of the data corpus')
 parser.add_argument('--model', type=str, default='LSTM',
@@ -103,8 +102,12 @@ parser.add_argument('--cuda', action='store_true',
 parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
 
-parser.add_argument('--save', type=str,  default='models/model_context',
+parser.add_argument('--save_model_directory', type=str,  default='models/',
                     help='path to save the final model')
+
+parser.add_argument('--save_model_name', type=str,  default='model_context_16_mai',
+                    help='path to save the final model')
+
 parser.add_argument('--save_every', type=int,  default=1,
                     help='number of epochs to run before saving model')
 parser.add_argument('--optimizer', type=str,  default='adam',
@@ -114,10 +117,8 @@ parser.add_argument('--eval_chars', type=int, default='100',
 parser.add_argument('--temperature', type=float, default=1.0,
                     help='temperature - higher will increase diversity')
 
-parser.add_argument('--pretrained_path', type=str, default="wiki_pretrained/glove_wiki/glove.6B.200d.txt",
-                    help='path to pretrained word2vec embedddings')
-
-parser.add_argument('--pretrained_vocab', type=str, default="preloaded/vocab.bin",
+parser.add_argument('--pretrained_vocab', type=str, \
+                    default="preloaded/vocab.bin",
                     help='path to pretrained vocabulary')
 
 parser.add_argument('--pretrained_embs', type=str, default="preloaded/embs.bin",
@@ -125,6 +126,15 @@ parser.add_argument('--pretrained_embs', type=str, default="preloaded/embs.bin",
 
 parser.add_argument('--ncontext', type=int, default=None,
                     help='number of previous melody symbols to take into account')
+
+parser.add_argument('--loss_directory', type=str, default="losses",
+                    help='name of the loss folder')
+
+parser.add_argument('--loss_name', type=str, default="loss",
+                    help='name of the loss file prefix')
+
+parser.add_argument('--compress', type=bool, default=False,
+                help='compress context embeddings')
 
 args = parser.parse_args()
 
@@ -169,11 +179,11 @@ train_data_lyrics_b  = batchify(corpus_lyrics.b_idxs, args.batch_size)
 ###############################################################################
 
 
-ntokens_music         = len(corpus_music.dictionary)
+ntokens_music   = len(corpus_music.dictionary)
 ntokens_lyrics  = len(corpus_lyrics.all_dictionary)
 model = model.RNNModel(args.model, ntokens_music, ntokens_lyrics , args.emsize, \
         args.nhid, args.nlayers, args.dropout, \
-        args.tied,corpus_lyrics.embeddings, args.ncontext)
+        args.tied,corpus_lyrics.embeddings, args.ncontext, args.compress)
 
 if args.cuda:
     model.cuda()
@@ -225,6 +235,7 @@ def get_cycle_batch(source, i, seq_len,evaluation = False, target = False, \
                 data  = torch.cat([data, data2])
 
     return data
+
 def get_batch2(source, source2, i, evaluation=False):
     seq_len = args.bptt
     data    = get_cycle_batch(source, i, seq_len, evaluation)
@@ -310,7 +321,8 @@ def get_last_chars(data_music, ncontext):
             last_char[j][i] = data_music[i - j - 1]
     return last_char
 
-def train():
+
+def train(ep_ix):
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0
@@ -321,6 +333,10 @@ def train():
     max_len = max([train_data_music_w.size(0) - 1,\
             train_data_lyrics_a.size(0) - 1,
             train_data_music_j.size(0) - 1, train_data_lyrics_b.size(0)])
+
+
+    losses = torch.Tensor(int(max_len / (args.bptt * args.log_interval))).fill_(0)
+    losses_ix = 0
 
     for batch, i in enumerate(range(0, max_len, args.bptt)):
         train_data_lyrics = None
@@ -357,6 +373,9 @@ def train():
         total_loss += loss.data
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss[0] / args.log_interval
+            if losses_ix < losses.size(0):
+                losses[losses_ix] = cur_loss
+                losses_ix += 1
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
@@ -364,27 +383,42 @@ def train():
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
-        print(batch)
+
+        ln = args.loss_name + "_" + str(ep_ix) + ".pkl"
+        loss_path = os.path.join(args.loss_directory, ln)
+
+        with open(loss_path, 'wb') as f:
+            torch.save(losses, loss_path)
+            # print("saved losses!")
+        print("went through batch " + str(batch))
+
 
 
 # Loop over epochs.
 lr = args.lr
 best_val_loss = None
 
-# At any point you can hit Ctrl + C to break out of training early.
+model_save_path = os.path.join(args.save_model_directory, args.save_model_name)
+
 try:
     for epoch in range(1, args.epochs+1):
         epoch_start_time = time.time()
-        train()
+        losses = train(epoch)
         evaluate()
         print('-' * 89)
-        print('| end of epoch {:3d} | time: {:5.2f}s'.format(epoch, (time.time() - epoch_start_time)))
+        print('| end of epoch {:3d} | time: {:5.2f}s'.format(epoch, \
+                (time.time() - epoch_start_time)))
         print('-' * 89)
         if epoch % args.save_every == 0:
             suffix = str(epoch) + "_";
-            with open(args.save + suffix + ".pt" , 'wb') as f:
+            with open(model_save_path + suffix + ".pt" , 'wb') as f:
                 torch.save(model, f)
-                print("saved model!")
+
+            # TODO change path
+            with open(args.save + suffix + "losses" , 'wb') as f:
+                torch.save(losses,f)
+                # print("saved model!")
+
 except KeyboardInterrupt:
     print('-' * 89)
     print('Exiting from training early')

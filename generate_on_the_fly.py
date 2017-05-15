@@ -11,6 +11,8 @@ import data_words_music
 import pdb
 import sys
 import re
+import os.path
+
 parser = argparse.ArgumentParser(description='PyTorch Music generation')
 
 # Model parameters.
@@ -102,7 +104,6 @@ if args.lyrics_path:
    with open(args.lyrics_path, "r") as inp:
       gen_lyrics = inp.read()
 
-print(gen_lyrics)
 gen_lyrics = re.sub(r"[^A-Za-z]", " ", gen_lyrics.strip()).split(" ")
 gen_lyrics = [x.lower() for x in gen_lyrics if len(x) > 0]
 
@@ -126,9 +127,7 @@ ntokens = len(corpus_music.dictionary)
 hidden = model.init_hidden(1)
 input = Variable(torch.rand(2, 1).mul(ntokens).long().cuda(), volatile=True)
 
-import os.path
-
-save_folder = os.path.join(args.outd, args.outf)
+save_prefix = os.path.join(args.outd, args.outf)
 
 num_melodies = args.num_melodies if not args.lyrics_path else 1
 
@@ -141,9 +140,9 @@ for index in range(num_melodies): # how many?
          last_chars = [torch.autograd.Variable(torch.LongTensor(1,1)\
                .fill_(0)) for i in range(args.ncontext)]
 
-      with open(save_folder + '_lyrics_' + str(index) , 'w') as outf_lyrics:
-         with open(save_folder + '_mel_'+ str(index) , 'w') as outf_song:
-            print(save_folder + '_lyrics_' + str(index))
+      with open(save_prefix + '_lyrics_' + str(index) , 'w') as outf_lyrics:
+         with open(save_prefix + '_mel_'+ str(index) , 'w') as outf_song:
+            print(save_prefix + '_lyrics_' + str(index))
             if args.dchoice == 0:
                outf_song.write('X: trist\n')
                outf_song.write('K: Am\n')
@@ -155,13 +154,12 @@ for index in range(num_melodies): # how many?
                else enumerate(range(args.word))
 
             for i,w in iterator:
-               print(i)
                word_idx = 0
                if gen_lyrics:
                   if w in corpus_lyrics.all_dictionary.word2idx:
                      word_idx = corpus_lyrics.all_dictionary.word2idx[w]
                   else:
-                     print(w + " not found!")
+                      pass
                else:
                    word_idx = test_data_lyrics[i + index * 2000,0]
 
@@ -188,4 +186,4 @@ for index in range(num_melodies): # how many?
                outf_song.write(char)
                outf_lyrics.write(word + " ");
                if i + 1 % args.log_interval == 0:
-                  print('| Generated {}/{} words'.format(i, args.words))
+                  print('| Generated {}/{} notes'.format(i, args.words))

@@ -1,5 +1,3 @@
-# Bitdefender 2017
-
 import os
 import torch
 import codecs
@@ -8,6 +6,8 @@ import gensim
 import pdb
 import torchwordemb
 import pickle
+
+
 class Dictionary_music(object):
     def __init__(self):
         self.char2idx = {}
@@ -83,9 +83,9 @@ class Corpus_music(object):
 
         return ids
 
-    def get_frequencies(self, dataset_name):
-        freq = {}
-        with open(dataset_name, 'r') as f:
+
+    def get_raw_frequency(self, file_name, freq):
+        with open(file_name, 'r') as f:
             for line in f:
                 if self.exclude(line):
                     continue
@@ -98,6 +98,45 @@ class Corpus_music(object):
                                 freq[c] += 1
         return freq
 
+
+
+    def get_frequencies(self, file_name):
+        import os.path
+        freq = {}
+        if os.path.isdir(file_name):
+            for f in os.listdir(file_name):
+                freq = self.get_raw_frequency(f, freq)
+        else:
+            freq = self.get_raw_frequency(file_name, freq)
+
+        all_notes = 0
+        for f in freq:
+            all_notes += freq[f]
+
+        for f in freq:
+            freq[f] = float(freq[f]) / float(all_notes)
+
+        d = sorted(freq)
+        t = torch.Tensor(len(d))
+
+        for i,k in enumerate(d):
+            t[i] = freq[k]
+
+        return freq
+
+
+    def plot_histogram(self, f, show_histogram=False, save_plot_path=None):
+        import numpy as np
+        import matplotlib.pyplot as plt
+        plt.bar([x for x in range(7)], f.values())
+        plt.title('Note frequencies')
+        plt.xlabel('Note names')
+        plt.xticks(list(range(7)), ('A', 'B', 'C', 'D', 'E', 'F', 'G'))
+        if save_plot_path:
+           plt.savefig(save_plot_path)
+           print("saved to " + save_plot_path)
+        if show_histogram:
+           plt.show()
 
 
 class Corpus_words(object):
@@ -130,8 +169,13 @@ class Corpus_words(object):
             vocab = model.wv.vocab
             vec = torch.from_numpy(model.wv.syn0)
         else:
-            with open(pretrained_vocab, "rb") as inp:
-                vocab, vec = pickle.load(inp), torch.load(pretrained_embs)
+            try:
+                with open(pretrained_vocab, "rb") as inp:
+                    vocab, vec = pickle.load(inp), torch.load(pretrained_embs)
+            except IOError:
+                print("preloaded vocab not found. " + \
+                        " run quick_save.py with the embeddings text file")
+                sys.exit(-1)
 
         self.embeddings = vec
 
@@ -148,13 +192,9 @@ class Corpus_words(object):
         a_corpus = [x.split(" ") for x in\
                 corpus_a.strip().split("\n") if len(x) > 0]
 
-        # a_corpus = [x for x in a_corpus if x in \
-                # self.all_dictionary.word2idx]
 
         b_corpus = [x.split(" ") for x in\
                 corpus_b.strip().split("\n") if len(x) > 0]
-        # b_corpus = [x for x in b_corpus if x in \
-                # self.all_dictionary.word2idx]
 
         tokens_a = 0
         for s in a_corpus:
@@ -242,6 +282,11 @@ def splitter(song):
 
 if __name__ == "__main__":
     cm = Corpus_music("data/music/")
-    path = os.path.join("data/music/", 'min.abc')
-    f = cm.get_frequencies(path)
-    print(f)
+    path_maj = os.path.join("data/music/", 'major.abc')
+    path_min = os.path.join("data/music/", 'minor.abc')
+
+    f_maj = cm.get_frequencies(path_maj)
+    cm.plot_histogram(f_maj, save_plot_path='plt.png')
+    # print(f_maj)
+    f_min = cm.get_frequencies(path_min)
+    # print(f_min)
