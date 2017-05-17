@@ -17,6 +17,11 @@ Additionally being able to specify whether we should use `cuda` or not, and spec
 
 Afterwards we may issue `python generate_on_the_fly.py --ncontext x --checkpoint <model_name> --lyrics_path <file_with_lyrics>`. `--checkpoint` accounts for the model we choose to use in generation, and `--lyrics_path` accounts for the lyrics file which shall give the words for the melody generation. 
 
+## Dataset
+All necessary data apart from the pretrained glove embeddings come included in the repo. We recommend retrieving a set of embeddings from [here](https://github.com/3Top/word2vec-api#where-to-get-a-pretrained-models), then running `python quick_save.py <downloaded glove embeddings> <where_to_save_vocab> <where_to_save_embeddings>`. Afterwards run `main.py` with `--pretrained_vocab <saved vocab file>` and `--pretrained_embs <saved embs file>`.
+Abc files come from http://www.atrilcoral.com, lyrics crawled from http://lyrics.wikia.com/.
+
+
 
 ## Credits
 Main inspiration taken from https://github.com/pytorch/examples/tree/master/word_language_model
