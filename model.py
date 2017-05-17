@@ -1,3 +1,5 @@
+# Bitdefender 2017
+
 import torch.nn as nn
 import torch
 from torch.autograd import Variable

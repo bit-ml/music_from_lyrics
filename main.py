@@ -1,3 +1,5 @@
+# Bitdefender 2017
+
 import argparse
 import time
 import math

@@ -1,7 +1,5 @@
 # Bitdefender 2017
 
-#! should be put in same folder as generated music
-
 import os.path
 import os
 import sys
