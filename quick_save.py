@@ -1,5 +1,3 @@
-# Bitdefender 2017
-
 import os
 import torch
 import codecs

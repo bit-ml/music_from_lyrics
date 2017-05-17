@@ -139,6 +139,9 @@ class Corpus_music(object):
            plt.show()
 
 
+
+
+
 class Corpus_words(object):
     def __init__(self, path, pretrained_vocab=None, pretrained_embs=None):
         corpus_txt = None
@@ -287,6 +290,7 @@ if __name__ == "__main__":
 
     f_maj = cm.get_frequencies(path_maj)
     cm.plot_histogram(f_maj, save_plot_path='plt.png')
+
     # print(f_maj)
-    f_min = cm.get_frequencies(path_min)
+    # f_min = cm.get_frequencies(path_min)
     # print(f_min)

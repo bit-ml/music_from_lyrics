@@ -1,10 +1,5 @@
 # /bin/python
 
-# Bitdefender 2017
-# Modified from:
-# http://stackoverflow.com/questions/23904552/crawling-this-website-to-grab-lyrics
-
-
 '''There are times when you want to transpose an abc file and are
 far too lazy to transpose them yourself. This is a python script you
 can use to transpose your files.

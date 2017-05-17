@@ -102,10 +102,10 @@ parser.add_argument('--cuda', action='store_true',
 parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
 
-parser.add_argument('--save_model_directory', type=str,  default='models/',
+parser.add_argument('--save_model_directory', type=str,  default='/data/music_from_lyrics_data/models/',
                     help='path to save the final model')
 
-parser.add_argument('--save_model_name', type=str,  default='model_context_16_mai',
+parser.add_argument('--save_model_name', type=str,  default='model_context_17_mai_nc10',
                     help='path to save the final model')
 
 parser.add_argument('--save_every', type=int,  default=1,
@@ -127,10 +127,10 @@ parser.add_argument('--pretrained_embs', type=str, default="preloaded/embs.bin",
 parser.add_argument('--ncontext', type=int, default=None,
                     help='number of previous melody symbols to take into account')
 
-parser.add_argument('--loss_directory', type=str, default="losses",
+parser.add_argument('--loss_directory', type=str, default="/data/music_from_lyrics_data/losses",
                     help='name of the loss folder')
 
-parser.add_argument('--loss_name', type=str, default="loss",
+parser.add_argument('--loss_name', type=str, default="loss_gru_2",
                     help='name of the loss file prefix')
 
 parser.add_argument('--compress', type=bool, default=False,
@@ -334,8 +334,7 @@ def train(ep_ix):
             train_data_lyrics_a.size(0) - 1,
             train_data_music_j.size(0) - 1, train_data_lyrics_b.size(0)])
 
-
-    losses = torch.Tensor(int(max_len / (args.bptt * args.log_interval))).fill_(0)
+    losses = torch.Tensor(int(max_len / (args.bptt))).fill_(0)
     losses_ix = 0
 
     for batch, i in enumerate(range(0, max_len, args.bptt)):
@@ -366,6 +365,10 @@ def train(ep_ix):
         loss = criterion(output.view(-1, ntokens), targets_music)
         optimizer.zero_grad()
         loss.backward()
+        # print(batch)
+        # print(len(losses))
+        if batch < len(losses):
+            losses[batch] = loss.data[0]
 
         torch.nn.utils.clip_grad_norm(model.parameters(), args.clip)
         optimizer.step()
@@ -384,13 +387,16 @@ def train(ep_ix):
             total_loss = 0
             start_time = time.time()
 
-        ln = args.loss_name + "_" + str(ep_ix) + ".pkl"
-        loss_path = os.path.join(args.loss_directory, ln)
+        # ln = args.loss_name + "_" + str(ep_ix) + ".pkl"
+        # loss_path = os.path.join(args.loss_directory, ln)
 
-        with open(loss_path, 'wb') as f:
-            torch.save(losses, loss_path)
+        # with open(loss_path, 'wb') as f:
+            # torch.save(losses, loss_path)
             # print("saved losses!")
+
         print("went through batch " + str(batch))
+
+    return losses
 
 
 
@@ -401,23 +407,33 @@ best_val_loss = None
 model_save_path = os.path.join(args.save_model_directory, args.save_model_name)
 
 try:
+    loss_means = torch.Tensor(args.epochs).fill_(0)
     for epoch in range(1, args.epochs+1):
         epoch_start_time = time.time()
         losses = train(epoch)
+
+        loss_mean = losses.mean()
+        loss_means[epoch - 1] = loss_mean
+
+        print(loss_means)
         evaluate()
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s'.format(epoch, \
                 (time.time() - epoch_start_time)))
         print('-' * 89)
+
         if epoch % args.save_every == 0:
             suffix = str(epoch) + "_";
+
             with open(model_save_path + suffix + ".pt" , 'wb') as f:
                 torch.save(model, f)
 
-            # TODO change path
-            with open(args.save + suffix + "losses" , 'wb') as f:
-                torch.save(losses,f)
-                # print("saved model!")
+            with open(model_save_path + suffix + "_losses" , 'wb') as f:
+                torch.save(losses, f)
+
+            with open(model_save_path + suffix + "_losses_epoch" , 'wb') as f:
+                torch.save(loss_means, f)
+
 
 except KeyboardInterrupt:
     print('-' * 89)

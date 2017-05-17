@@ -19,13 +19,14 @@ parser = argparse.ArgumentParser(description='PyTorch Music generation')
 parser.add_argument('--data', type=str, default='./data',
       help='location of the data corpus')
 
-parser.add_argument('--checkpoint', type=str, default='./models/model_context30_.pt',
+parser.add_argument('--checkpoint', type=str, \
+        default='./models/model_context_10_mai40_.pt',
       help='model checkpoint to use')
 
 parser.add_argument('--outd', type=str, default='generated_music',
       help='output directory for generated music')
 
-parser.add_argument('--outf', type=str, default='context_music',
+parser.add_argument('--outf', type=str, default='context_music_17mai_gru',
       help='output file for generated text')
 
 parser.add_argument('--words', type=int, default='1000',
@@ -103,9 +104,8 @@ gen_lyrics = None
 if args.lyrics_path:
    with open(args.lyrics_path, "r") as inp:
       gen_lyrics = inp.read()
-
-gen_lyrics = re.sub(r"[^A-Za-z]", " ", gen_lyrics.strip()).split(" ")
-gen_lyrics = [x.lower() for x in gen_lyrics if len(x) > 0]
+      gen_lyrics = re.sub(r"[^A-Za-z]", " ", gen_lyrics.strip()).split(" ")
+      gen_lyrics = [x.lower() for x in gen_lyrics if len(x) > 0]
 
 corpus_lyrics = None
 if args.use_glove:
@@ -129,9 +129,9 @@ input = Variable(torch.rand(2, 1).mul(ntokens).long().cuda(), volatile=True)
 
 save_prefix = os.path.join(args.outd, args.outf)
 
-num_melodies = args.num_melodies if not args.lyrics_path else 1
+num_songs = args.num_songs if not args.lyrics_path else 1
 
-for index in range(num_melodies): # how many?
+for index in range(num_songs): # how many?
    if args.ncontext:
       if args.cuda:
          last_chars = [torch.autograd.Variable(torch.LongTensor(1,1)\
@@ -151,7 +151,7 @@ for index in range(num_melodies): # how many?
                outf_song.write('K: C\n')
 
             iterator = enumerate(gen_lyrics) if gen_lyrics is not None\
-               else enumerate(range(args.word))
+               else enumerate(range(args.words))
 
             for i,w in iterator:
                word_idx = 0
