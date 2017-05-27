@@ -17,7 +17,7 @@ if __name__ == "__main__":
     vocab, vec = torchwordemb.load_glove_text(sys.argv[1])
     print("saving...")
     with open(sys.argv[2], 'wb') as output:
-        pickle.dump(vocab, output, -1) 
+        pickle.dump(vocab, output, -1)
     torch.save(vec, sys.argv[3])
     print("done!")
 

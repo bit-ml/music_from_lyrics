@@ -47,7 +47,6 @@ def save_to_file(model, char_len, fname):
                      for i in range(args.ncontext)]
 
 
-
       for i in range(char_len):
          input[1,:] = train_data_lyrics[i % len(train_data_lyrics),0]
          output, hidden = model(input, hidden, last_chars)
@@ -141,7 +140,7 @@ parser.add_argument('--compress', type=bool, default=False,
 args = parser.parse_args()
 
 if args.cuda:
-    torch.cuda.set_device(4)
+    torch.cuda.set_device(0)
 # Set the random seed manually for reproducibility.
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
@@ -175,6 +174,10 @@ train_data_music_w  = batchify(corpus_music.train_w, args.batch_size)
 train_data_lyrics_a  = batchify(corpus_lyrics.a_idxs, args.batch_size)
 train_data_lyrics_b  = batchify(corpus_lyrics.b_idxs, args.batch_size)
 
+train_data_sentiment_a  = batchify(corpus_lyrics.a_sentiments, args.batch_size)
+train_data_sentiment_b  = batchify(corpus_lyrics.b_sentiments, args.batch_size)
+
+
 
 ###############################################################################
 # Build the model
@@ -207,13 +210,6 @@ def repackage_hidden(h):
     else:
         return tuple(repackage_hidden(v) for v in h)
 
-
-def get_batch(source, i, evaluation=False):
-    seq_len = min(args.bptt, len(source) - 1 - i)
-    data = Variable(source[i:i+seq_len], volatile=evaluation)
-    target = Variable(source[i+1:i+1+seq_len].view(-1))
-    return data, target
-
 def get_cycle_batch(source, i, seq_len,evaluation = False, target = False, \
       prev=None):
     inc = i % len(source)
@@ -238,14 +234,21 @@ def get_cycle_batch(source, i, seq_len,evaluation = False, target = False, \
 
     return data
 
-def get_batch2(source, source2, i, evaluation=False):
+def get_batch_cycle(source, source_lyrics, i, evaluation=False, source_sentiment=None):
     seq_len = args.bptt
     data    = get_cycle_batch(source, i, seq_len, evaluation)
     target  = get_cycle_batch(source, i + 1, seq_len, evaluation, True)
-    data2    = get_cycle_batch(source2, i, seq_len, evaluation)
+    data_lyrics    = get_cycle_batch(source_lyrics, i, seq_len, evaluation)
+    data_sentiment = None
+    if source_sentiment is not None:
+        data_sentiment = get_cycle_batch(source_sentiment, i, \
+                seq_len, evaluation)
 
-
-    return data, target, data2
+    
+    if source_sentiment is None:
+        return data, target, data_lyrics
+    else:
+        return data, target, data_lyrics, data_sentiment
 
 def evaluate():
     # Turn on evaluation mode which disables dropout.
@@ -256,15 +259,18 @@ def evaluate():
     input = Variable(torch.rand(2, 1).mul(ntokens).long(), volatile=True)
     train_data_lyrics = None
     train_data_music = None
+    train_data_sentiment = None
 
     # again random selection between datasets
     data_choice = randint(0,1)
     if data_choice == 0:
         train_data_lyrics = train_data_lyrics_a
         train_data_music  = train_data_music_w
+        train_data_sentiment = train_data_sentiment_a 
     else:
         train_data_lyrics = train_data_lyrics_b
         train_data_music  = train_data_music_j
+        train_data_sentiment = train_data_sentiment_b
 
     if args.cuda:
         input.data = input.data.cuda()
@@ -306,6 +312,9 @@ def evaluate():
 
 from random import randint
 
+import nltk
+import nltk.sentiment
+
 def get_last_chars(data_music, ncontext):
     if args.cuda:
       last_char = [torch.autograd.Variable(torch.LongTensor(35,20).cuda()\
@@ -332,6 +341,7 @@ def train(ep_ix):
     ntokens = len(corpus_music.dictionary)
     hidden = model.init_hidden(args.batch_size)
 
+    # we could treat alignment here
     max_len = max([train_data_music_w.size(0) - 1,\
             train_data_lyrics_a.size(0) - 1,
             train_data_music_j.size(0) - 1, train_data_lyrics_b.size(0)])
@@ -342,17 +352,21 @@ def train(ep_ix):
     for batch, i in enumerate(range(0, max_len, args.bptt)):
         train_data_lyrics = None
         train_data_music = None
+        train_data_sentiment = None
         # random choice between what dataset to use
         data_choice = randint(0,1)
         if data_choice == 0:
             train_data_lyrics = train_data_lyrics_a
             train_data_music  = train_data_music_w
+            train_data_sentiment = train_data_sentiment_a
         else:
             train_data_lyrics = train_data_lyrics_b
             train_data_music  = train_data_music_j
+            train_data_sentiment = train_data_sentiment_b
 
-        data_music, targets_music, data_lyrics= \
-                get_batch2(train_data_music, train_data_lyrics, i)
+        data_music, targets_music, data_lyrics, data_sentiment = \
+                get_batch_cycle(train_data_music, train_data_lyrics, i,\
+                evaluation=False, source_sentiment=train_data_sentiment)
 
         last_chars = None
         if args.ncontext:
@@ -367,8 +381,7 @@ def train(ep_ix):
         loss = criterion(output.view(-1, ntokens), targets_music)
         optimizer.zero_grad()
         loss.backward()
-        # print(batch)
-        # print(len(losses))
+
         if batch < len(losses):
             losses[batch] = loss.data[0]
 

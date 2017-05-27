@@ -6,6 +6,8 @@ import gensim
 import pdb
 import torchwordemb
 import pickle
+import nltk
+import nltk.sentiment
 
 
 class Dictionary_music(object):
@@ -23,14 +25,21 @@ class Dictionary_music(object):
 
 
 class Dictionary_words(object):
-    def __init__(self):
+    def __init__(self, sentiment=None):
         self.word2idx = {}
         self.idx2word = []
+        self.sentiment = sentiment
+        if self.sentiment != None:
+            self.idx2sentiment = {}
 
     def add_word(self, word):
         if word not in self.word2idx:
             self.idx2word.append(word)
             self.word2idx[word] = len(self.idx2word) - 1
+            if self.sentiment:
+                ix = self.word2idx[word]
+                self.idx2sentiment[ix] = \
+                        self.sentiment.polarity_scores(word)["compound"]
         return self.word2idx[word]
 
     def __len__(self):
@@ -148,9 +157,14 @@ class Corpus_words(object):
         corpus_a = None
         corpus_b = None
 
+        self.sentiment_scores = None
+
         corpus_path = os.path.join(path, "all.txt")
         a_path = os.path.join(path, "thrash.txt")
         b_path = os.path.join(path, "pop.txt")
+
+        self.sentiment_analyzer =\
+                nltk.sentiment.vader.SentimentIntensityAnalyzer()
 
         with open(corpus_path, "r") as f:
             corpus_txt = f.read()
@@ -182,11 +196,12 @@ class Corpus_words(object):
 
         self.embeddings = vec
 
-        self.all_dictionary = Dictionary_words()
+        self.all_dictionary = Dictionary_words(self.sentiment_analyzer)
 
         self.a_dictionary = Dictionary_words()
         self.b_dictionary = Dictionary_words()
 
+        self.sentiment_scores = {}
 
         for k in vocab:
             self.all_dictionary.add_word(k)
@@ -207,11 +222,13 @@ class Corpus_words(object):
                     self.a_dictionary.add_word(w)
 
         self.a_idxs = torch.zeros(tokens_a).long()
+        self.a_sentiments = torch.zeros(tokens_a)
         ix = 0
         for s in a_corpus:
             for w in s:
                 if w in self.all_dictionary.word2idx:
                     self.a_idxs[ix] = self.all_dictionary.word2idx[w]
+                    self.a_sentiments[ix] = self.all_dictionary.idx2sentiment[ix]
                     ix += 1
 
         tokens_b = 0
@@ -225,13 +242,13 @@ class Corpus_words(object):
                     self.b_dictionary.add_word(w)
 
         self.b_idxs = torch.zeros(tokens_b).long()
+        self.b_sentiments = torch.zeros(tokens_b)
         for s in b_corpus:
             for w in s:
                 if w in self.all_dictionary.word2idx:
                     self.b_idxs[ix] = self.all_dictionary.word2idx[w]
+                    self.b_sentiments[ix] = self.all_dictionary.idx2sentiment[ix]
                     ix += 1
-
-
 
     def tokenize(self, path):
         """Tokenizes a text file."""

@@ -5,6 +5,8 @@ import torch
 from torch.autograd import Variable
 import sys
 import pdb
+import nltk
+import nltk.sentiment.vader
 
 class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
@@ -18,6 +20,7 @@ class RNNModel(nn.Module):
         self.compressor     = None
         self.ncontext       = ncontext
         self.ninp           = ninp
+        self.sentiment_evaluator = nltk.sentiment.vader.SentimentIntensityAnalyzer()
 
         if pre_embeds is not None:
             embeddings = pre_embeds #torch.from_numpy(pre_embeds.wv.syn0)
