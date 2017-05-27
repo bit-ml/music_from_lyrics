@@ -204,7 +204,8 @@ class Corpus_words(object):
         self.sentiment_scores = {}
 
         for k in vocab:
-            self.all_dictionary.add_word(k)
+            if abs(self.sentiment_analyzer.polarity_scores(k)["compound"]) > 0.2:
+                self.all_dictionary.add_word(k)
 
 
         a_corpus = [x.split(" ") for x in\
@@ -228,7 +229,7 @@ class Corpus_words(object):
             for w in s:
                 if w in self.all_dictionary.word2idx:
                     self.a_idxs[ix] = self.all_dictionary.word2idx[w]
-                    self.a_sentiments[ix] = self.all_dictionary.idx2sentiment[ix]
+                    self.a_sentiments[ix] = self.all_dictionary.idx2sentiment[self.a_idxs[ix]]
                     ix += 1
 
         tokens_b = 0
@@ -247,7 +248,7 @@ class Corpus_words(object):
             for w in s:
                 if w in self.all_dictionary.word2idx:
                     self.b_idxs[ix] = self.all_dictionary.word2idx[w]
-                    self.b_sentiments[ix] = self.all_dictionary.idx2sentiment[ix]
+                    self.b_sentiments[ix] = self.all_dictionary.idx2sentiment[self.b_idxs[ix]]
                     ix += 1
 
     def tokenize(self, path):

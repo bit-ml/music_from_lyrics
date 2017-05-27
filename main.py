@@ -106,10 +106,10 @@ parser.add_argument('--log-interval', type=int, default=200, metavar='N',
 parser.add_argument('--save_model_directory', type=str,  default='/data/music_from_lyrics_data/models/',
                     help='path to save the final model')
 
-parser.add_argument('--save_model_name', type=str,  default='model_context_17_mai_nc10',
+parser.add_argument('--save_model_name', type=str,  default='model_context_27_mai_nc4sen',
                     help='path to save the final model')
 
-parser.add_argument('--save_every', type=int,  default=1,
+parser.add_argument('--save_every', type=int,  default=10,
                     help='number of epochs to run before saving model')
 parser.add_argument('--optimizer', type=str,  default='adam',
                     help='optimizer to use for training')
@@ -193,6 +193,7 @@ model = model.RNNModel(args.model, ntokens_music, ntokens_lyrics , args.emsize, 
 if args.cuda:
     model.cuda()
 
+# this goes all the way down into thnn, cannot be rewritten to return batch only
 criterion = nn.CrossEntropyLoss()
 
 optimizer = None
@@ -377,7 +378,8 @@ def train(ep_ix):
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
         output, hidden = model(all_data, hidden, last_chars)
-
+        # print(train_data_sentiment)
+        # print(output.view(-1, ntokens))
         loss = criterion(output.view(-1, ntokens), targets_music)
         optimizer.zero_grad()
         loss.backward()
