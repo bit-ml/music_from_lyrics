@@ -12,7 +12,7 @@ class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
     def __init__(self, rnn_type, ntoken, ntokens_lyrics, ninp, nhid, nlayers, dropout=0.5, tie_weights=False, pre_embeds=None,
-            ncontext=None, compressor=None):
+            ncontext=None, compressor=None, add_sentiment=False):
         super(RNNModel, self).__init__()
         self.drop           = nn.Dropout(dropout)
         self.encoder        = nn.Embedding(ntoken, ninp)
@@ -33,9 +33,11 @@ class RNNModel(nn.Module):
 
         if rnn_type in ['LSTM', 'GRU']:
             added = ncontext if ncontext else 0
+            a_s = 1 if add_sentiment is not False else 0 
             if self.compressor:
                 added = 1
-            self.rnn = getattr(nn, rnn_type)((2 + added) * ninp, nhid, nlayers)#, dropout=dropout)
+
+            self.rnn = getattr(nn, rnn_type)((2 + added) * ninp + a_s, nhid, nlayers)#, dropout=dropout)
         else:
             try:
                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
@@ -69,7 +71,7 @@ class RNNModel(nn.Module):
         self.decoder.bias.data.fill_(0)
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, input, hidden, extra_notes):
+    def forward(self, input, hidden, extra_notes, sentiment=None):
         half = int(input.size(0) / 2)
         data        = input[0:half,:]
         data_lyrics = input[half:,:]
@@ -79,7 +81,7 @@ class RNNModel(nn.Module):
         emb = self.encoder(data)
         emb2 = self.encoder_lyrics(data_lyrics)
         emb_combined = torch.cat([emb, emb2],2)
-
+        
         if not self.compressor and (self.ncontext is not None):
             for i in range(self.ncontext):
                 emb_extra = self.drop(self.encoder(extra_notes[i]))
@@ -101,6 +103,10 @@ class RNNModel(nn.Module):
             embs_compressed = embs_compressed.view(emb_size)
 
             emb_combined = torch.cat([emb_combined, embs_compressed], 2)
+
+        if sentiment is not None: # account for sentiment as well
+            sentiment = sentiment.unsqueeze(2)
+            emb_combined = torch.cat([emb_combined, sentiment], 2)
 
         output, hidden = self.rnn(emb_combined, hidden)
         output = self.drop(output)

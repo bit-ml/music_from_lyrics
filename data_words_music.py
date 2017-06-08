@@ -204,8 +204,8 @@ class Corpus_words(object):
         self.sentiment_scores = {}
 
         for k in vocab:
-            if abs(self.sentiment_analyzer.polarity_scores(k)["compound"]) > 0.2:
-                self.all_dictionary.add_word(k)
+            # if abs(self.sentiment_analyzer.polarity_scores(k)["compound"]) > 0.2:
+            self.all_dictionary.add_word(k)
 
 
         a_corpus = [x.split(" ") for x in\

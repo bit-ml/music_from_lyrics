@@ -106,7 +106,7 @@ parser.add_argument('--log-interval', type=int, default=200, metavar='N',
 parser.add_argument('--save_model_directory', type=str,  default='/data/music_from_lyrics_data/models/',
                     help='path to save the final model')
 
-parser.add_argument('--save_model_name', type=str,  default='model_context_27_mai_nc4sen',
+parser.add_argument('--save_model_name', type=str,  default='model_context_27_mai_nc5nosen',
                     help='path to save the final model')
 
 parser.add_argument('--save_every', type=int,  default=10,
@@ -136,6 +136,9 @@ parser.add_argument('--loss_name', type=str, default="loss_gru_2",
 
 parser.add_argument('--compress', type=bool, default=False,
                 help='compress context embeddings')
+
+parser.add_argument('--add_sentiment', type=bool, default=False,
+                help='adds a sentiment value as input to the rnn')
 
 args = parser.parse_args()
 
@@ -188,7 +191,7 @@ ntokens_music   = len(corpus_music.dictionary)
 ntokens_lyrics  = len(corpus_lyrics.all_dictionary)
 model = model.RNNModel(args.model, ntokens_music, ntokens_lyrics , args.emsize, \
         args.nhid, args.nlayers, args.dropout, \
-        args.tied,corpus_lyrics.embeddings, args.ncontext, args.compress)
+        args.tied,corpus_lyrics.embeddings, args.ncontext, args.compress, add_sentiment=args.add_sentiment)
 
 if args.cuda:
     model.cuda()
@@ -377,9 +380,9 @@ def train(ep_ix):
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
-        output, hidden = model(all_data, hidden, last_chars)
-        # print(train_data_sentiment)
-        # print(output.view(-1, ntokens))
+        if args.add_sentiment is False:
+            data_sentiment = None
+        output, hidden = model(all_data, hidden, last_chars, sentiment=data_sentiment)
         loss = criterion(output.view(-1, ntokens), targets_music)
         optimizer.zero_grad()
         loss.backward()
