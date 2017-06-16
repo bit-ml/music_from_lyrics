@@ -106,7 +106,7 @@ parser.add_argument('--log-interval', type=int, default=200, metavar='N',
 parser.add_argument('--save_model_directory', type=str,  default='/data/music_from_lyrics_data/models/',
                     help='path to save the final model')
 
-parser.add_argument('--save_model_name', type=str,  default='model_context_27_mai_nc5nosen',
+parser.add_argument('--save_model_name', type=str,  default='model_context_16_iunie_nc10sen_lstm',
                     help='path to save the final model')
 
 parser.add_argument('--save_every', type=int,  default=10,
@@ -179,7 +179,6 @@ train_data_lyrics_b  = batchify(corpus_lyrics.b_idxs, args.batch_size)
 
 train_data_sentiment_a  = batchify(corpus_lyrics.a_sentiments, args.batch_size)
 train_data_sentiment_b  = batchify(corpus_lyrics.b_sentiments, args.batch_size)
-
 
 
 ###############################################################################
@@ -436,13 +435,13 @@ try:
         loss_means[epoch - 1] = loss_mean
 
         print(loss_means)
-        evaluate()
+        # evaluate()
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s'.format(epoch, \
                 (time.time() - epoch_start_time)))
         print('-' * 89)
 
-        if epoch % args.save_every == 0:
+        if epoch % args.save_every == 0 or epoch == 0:
             suffix = str(epoch) + "_";
 
             with open(model_save_path + suffix + ".pt" , 'wb') as f:

@@ -14,6 +14,8 @@ import sys
 
 mn = sys.argv[1]
 
+plot_name = sys.argv[2]
+
 errs = torch.load(mn).numpy()
 
 last_ix = -1
@@ -26,7 +28,7 @@ errs = errs[:last_ix]
 
 fg = plt.figure()
 plt.plot(errs)
-fg.suptitle(mn +  ' error', fontsize=20)
+fg.suptitle(plot_name +  ' error', fontsize=20)
 plt.xlabel('batch groups', fontsize=16)
 plt.ylabel('error', fontsize=16)
 fg.savefig(mn + '.jpg')

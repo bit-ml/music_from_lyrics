@@ -8,3 +8,4 @@ wiki_pretrained/*
 generated*
 preloaded/*
 *.swp
+generated_music/*

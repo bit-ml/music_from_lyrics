@@ -26,7 +26,7 @@ parser.add_argument('--checkpoint', type=str, \
 parser.add_argument('--outd', type=str, default='generated_music',
       help='output directory for generated music')
 
-parser.add_argument('--outf', type=str, default='context_music_17mai_gru',
+parser.add_argument('--outf', type=str, default='sentiment_lyrics',
       help='output file for generated text')
 
 parser.add_argument('--words', type=int, default='1000',
@@ -119,9 +119,10 @@ corpus_music = data_words_music.Corpus_music(args.data + "/music")
 
 if args.dchoice == 0:
    test_data_lyrics    = batchify(corpus_lyrics.a_idxs, 1)
+   test_data_sentiment = batchify(corpus_lyrics.a_sentiments, 1)
 else:
    test_data_lyrics    = batchify(corpus_lyrics.b_idxs, 1)
-
+   test_data_sentiment = batchify(corpus_lyrics.b_sentiments, 1)
 
 ntokens = len(corpus_music.dictionary)
 hidden = model.init_hidden(1)
@@ -152,19 +153,23 @@ for index in range(num_songs): # how many?
 
             iterator = enumerate(gen_lyrics) if gen_lyrics is not None\
                else enumerate(range(args.words))
-
+            
             for i,w in iterator:
+               sentiment = 0 
                word_idx = 0
                if gen_lyrics:
                   if w in corpus_lyrics.all_dictionary.word2idx:
                      word_idx = corpus_lyrics.all_dictionary.word2idx[w]
+                     sentiment = torch.autograd.Variable(torch.Tensor(corpus_lyrics.all_dictionary.idx2sentiment[word_idx]).unsqueeze(1))
                   else:
                       pass
                else:
                    word_idx = test_data_lyrics[i + index * 2000,0]
+                   sentiment = torch.autograd.Variable(test_data_sentiment[i + index * 2000].unsqueeze(1))
+
 
                input[1,:] = word_idx
-               output, hidden = model(input, hidden, last_chars)
+               output, hidden = model(input, hidden, last_chars, sentiment=sentiment)
                word_weights = output.squeeze().\
                      data.div(args.temperature).exp().cpu()
                note_idx = torch.multinomial(word_weights, 1)[0]
